@@ -1,0 +1,10 @@
+{"time":"2026-08-13T17:37:28.692567121Z","level":"INFO","msg":"main: starting server","port-filename":"/tmp/tmp4ulrymf_/port-3637.txt","pid":3637,"detached":false,"idle-timeout":600000000000,"log-level":0,"disable-analytics":false,"shutdown-on-parent-exit":false,"enable-dcgm-profiling":false}
+{"time":"2026-08-13T17:37:28.693395406Z","level":"INFO","msg":"server: will exit if parent process dies","ppid":3637}
+{"time":"2026-08-13T17:37:28.693397348Z","level":"INFO","msg":"server: accepting connections","addr":{"Name":"/tmp/wandb-3637-5420-3440496253/socket","Net":"unix"}}
+{"time":"2026-08-13T17:37:28.827034688Z","level":"INFO","msg":"connection: ManageConnectionData: new connection created","id":"1(@)"}
+{"time":"2026-08-13T17:37:28.842152064Z","level":"INFO","msg":"handleInformInit: received","streamId":"fdvzd6up","id":"1(@)"}
+{"time":"2026-08-13T17:37:28.948395809Z","level":"INFO","msg":"handleInformInit: stream started","streamId":"fdvzd6up","id":"1(@)"}
+{"time":"2026-08-13T17:37:29.667748833Z","level":"INFO","msg":"connection: cancelling request","id":"1(@)","requestId":"x4c05jfbfwcj"}
+{"time":"2026-08-13T18:30:17.693881046Z","level":"INFO","msg":"connection: cancelling request","id":"1(@)","requestId":"f31ltm3bnhds"}
+{"time":"2026-08-13T18:30:17.700929432Z","level":"INFO","msg":"handleInformFinish: finish message received","streamId":"fdvzd6up","id":"1(@)"}
+{"time":"2026-08-13T18:30:17.704301162Z","level":"INFO","msg":"handleInformFinish: stream closed","streamId":"fdvzd6up","id":"1(@)"}
