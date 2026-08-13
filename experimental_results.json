@@ -1,0 +1,98 @@
+[
+	{
+		"model": "RLinear",
+		"dataset": "ECL",
+		"metrics": {
+			"mse": 0.1973,
+			"mae": 0.2740
+		}
+	},
+	{
+		"model": "RLinear",
+		"dataset": "Traffic",
+		"metrics": {
+			"mse": 0.6463,
+			"mae": 0.3844
+		}
+	},
+	{
+		"model": "Informer",
+		"dataset": "ECL",
+		"metrics": {
+			"mse": 0.32632729411125183,
+			"mae": 0.4068123698234558
+		}
+	},
+	{
+		"model": "Informer",
+		"dataset": "Traffic",
+		"metrics": {
+			"mse": 1.0139495134353638,
+			"mae": 0.5624265074729919
+		}
+	},
+	{
+		"model": "PatchTST",
+		"dataset": "ECL",
+		"metrics": {
+			"mse": 0.17544597387313843,
+			"mae": 0.2602875828742981
+		}
+	},
+	{
+		"model": "PatchTST",
+		"dataset": "Traffic",
+		"metrics": {
+			"mse": 0.4699113368988037,
+			"mae": 0.3004860579967499
+		}
+	},
+	{
+		"model": "iTransformer",
+		"dataset": "ECL",
+		"metrics": {
+			"mse": 0.14809605479240417,
+			"mae": 0.23984558880329132
+		}
+	},
+	{
+		"model": "iTransformer",
+		"dataset": "Traffic",
+		"metrics": {
+			"mse": 0.39313066005706787,
+			"mae": 0.268658846616745
+		}
+	},
+	{
+		"model": "xLSTM-Mixer",
+		"dataset": "ECL",
+		"metrics": {
+			"mse": 0.14800050854682922,
+			"mae": 0.23521609604358673
+		}
+	},
+	{
+		"model": "xLSTM-Mixer",
+		"dataset": "Traffic",
+		"metrics": {
+			"mse": 0.4156632423400879,
+			"mae": 0.26071280241012573
+		}
+	},
+	{
+		"model": "Transformixer",
+		"dataset": "ECL",
+		"metrics": {
+			"mse": 0.1517021805047989,
+			"mae": 0.2363576740026474
+		}
+	},
+	{
+		"model": "Transformixer",
+		"dataset": "Traffic",
+		"metrics": {
+			"mse": 0.40676528215408325,
+			"mae": 0.2557980418205261
+		}
+	}
+]
