@@ -1,3 +1,15 @@
+.venv/
 **/results/
 *.ckpt
 *.pth
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.nav
+*.snm
+*.toc
