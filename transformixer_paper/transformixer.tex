@@ -64,7 +64,7 @@ This view is complementary to iTransformer~\citep{liu2024itransformer}: we reuse
 \paragraph{Contributions.}
 \begin{itemize}
   \item We introduce Transformixer, a drop-in permutation-equivariant Transformer variate mixer for the xLSTM-Mixer pipeline.
-  \item We analyze inductive-bias differences versus ordered sLSTM mixing (equivariance, global interactions, architectural simplification, and parallelism), not only forecasting accuracy.
+  \item We analyze inductive-bias differences versus ordered sLSTM mixing (equivariance, global interactions, architectural simplification, and parallelism), not only forecasting accuracy, and report training throughput.
   \item We compare against five baselines on Electricity and Traffic ($L{=}H{=}96$) and report a controlled mixer ablation (sLSTM FULL, PE-free Transformer, Transformer with fixed PE, and NLinear-only) under a shared training recipe.
   \item We discuss when the redesign helps and how the equivariance--accuracy tradeoff depends on the dataset, under clearly stated limitations.
 \end{itemize}
@@ -194,7 +194,8 @@ Beyond equivariance, replacing sLSTM with attention is motivated by several indu
 
   \item \textbf{Hardware-parallel mixing.}
   Attention is token-parallel over $C$, whereas recurrence is sequential in $C$.
-  We do \emph{not} claim wall-clock superiority: attention costs $O(C^2 d)$ per layer and may become expensive for very large $C$.
+  Attention costs $O(C^2 d)$ per layer and may become expensive for very large $C$.
+  Section~\ref{sec:throughput} reports training throughput under this tradeoff; we do not claim a general wall-clock advantage.
 \end{enumerate}
 
 \begin{table}[t]
@@ -235,6 +236,7 @@ For each baseline, we follow the hyperparameters recommended by the authors of t
 In contrast, Transformixer does \emph{not} benefit from a dedicated hyperparameter search: its architectural and optimization settings are largely inherited from the xLSTM-Mixer experimental scripts rather than tuned specifically for the Transformer mixer.
 The baselines therefore enjoy published, author-recommended configurations, while Transformixer is evaluated under a comparatively untuned setup.
 We treat the study as an architectural comparison under practical training budgets rather than a fully unified or exhaustively tuned hyperparameter sweep.
+All experiments were executed on an NVIDIA L4 GPU.
 
 \paragraph{Controlled mixer ablation.}
 To isolate the effect of the variate mixer while keeping the temporal front-end fixed, we retrain four variants under the same recipe above: (A) NLinear-only (RevIN+NLinear with the mixer disabled), (B) xLSTM-Mixer FULL (sLSTM with memory tokens and forward/reverse fusion), (C) Transformixer without PE (our default), and (D) Transformixer with fixed sinusoidal PE on variate tokens.
@@ -380,6 +382,31 @@ This qualitative pattern aligns with the claim that the mixer models direct pair
   \label{fig:attn}
 \end{figure}
 
+\subsection{Training throughput}
+\label{sec:throughput}
+
+Table~\ref{tab:throughput} reports training throughput (iterations per second) for xLSTM-Mixer and the PE-free Transformixer default under the shared mixer recipe on an NVIDIA L4 GPU (batch size $32$, $L{=}H{=}96$).
+These figures include the forward and backward pass together with data loading and logging; they are not isolated FLOPs, peak-memory, or inference-latency measurements.
+
+On ECL ($C{=}321$), Transformixer trains at $4.67$ it/s versus $3.53$ it/s for xLSTM-Mixer ($\approx$32\% higher throughput).
+On Traffic ($C{=}862$), the two are essentially tied ($1.33$ vs.\ $1.32$ it/s).
+The pattern is consistent with token-parallel attention being advantageous at moderate $C$, while quadratic attention cost offsets that advantage at high $C$.
+We therefore do not claim a general wall-clock superiority.
+
+\begin{table}[t]
+  \centering
+  \caption{Training throughput (it/s; higher is faster) on an NVIDIA L4 GPU under the shared mixer recipe (batch size $32$, $L{=}H{=}96$). Transformixer is the PE-free default.}
+  \label{tab:throughput}
+  \begin{tabular}{lccc}
+    \toprule
+    Dataset & $C$ & xLSTM-Mixer & Transformixer \\
+    \midrule
+    ECL     & 321 & 3.53 & 4.67 \\
+    Traffic & 862 & 1.32 & 1.33 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
 \section{Discussion}
 \label{sec:discussion}
 
@@ -394,7 +421,8 @@ The ECL PE gain suggests that index-aware structure can be useful even when chan
 
 \paragraph{Complexity tradeoff.}
 Attention is more hardware-parallel over channels but asymptotically quadratic in $C$.
-We did not profile latency or FLOPs in this study; efficiency claims would require dedicated measurement.
+Table~\ref{tab:throughput} matches that tradeoff: Transformixer is faster to train on ECL and matches xLSTM-Mixer on the high-$C$ Traffic benchmark.
+Because the numbers are single-run training throughputs rather than FLOPs or inference latency, we do not claim general hardware superiority.
 For extremely large $C$, sparse or linearized attention could be a natural extension.
 
 \paragraph{Threats to validity.}
@@ -405,7 +433,7 @@ This asymmetry may understate Transformixer's potential relative to well-tuned b
 These factors limit statistical strength and strict comparability; we report them explicitly because the project was constrained by compute and time.
 
 \paragraph{Future work.}
-A fuller evaluation would include horizons $\{96,192,336,720\}$, additional datasets (e.g., ETT, Weather), multi-seed mean$\pm$std, ablations over mixer depth and head count, and efficiency profiling.
+A fuller evaluation would include horizons $\{96,192,336,720\}$, additional datasets (e.g., ETT, Weather), multi-seed mean$\pm$std, ablations over mixer depth and head count, and FLOPs / peak-memory profiling.
 Motivated by the dataset-dependent PE results, an appealing direction is to learn a global channel permutation or soft ordering jointly with the mixer via a differentiable relaxation such as Gumbel-Sinkhorn or differentiable sorting, allowing the model to discover an index-aware layout when it helps without committing to a fixed arbitrary order a priori.
 Such experiments are feasible with additional GPU resources but were out of scope here.
 
@@ -415,12 +443,13 @@ Such experiments are feasible with additional GPU resources but were out of scop
 Transformixer replaces the order-sensitive sLSTM variate mixer in xLSTM-Mixer with a PE-free Transformer over variate tokens, preserving RevIN and shared NLinear temporal mixing.
 The redesign targets permutation equivariance, direct multi-head interactions, and a simpler single-view architecture without memory tokens.
 Empirically, under a limited protocol, Transformixer+PE achieves the best ECL result among compared models, while the PE-free default improves on xLSTM-Mixer for Traffic.
+On an NVIDIA L4 GPU, Transformixer trains faster on ECL and matches xLSTM-Mixer on Traffic, consistent with parallel mixing at moderate $C$ and quadratic attention cost at high $C$.
 The controlled ablation further shows that variate mixing is necessary on both datasets and that positional bias is not uniformly beneficial: fixed PE helps ECL but hurts Traffic relative to the equivariant default.
 We view the contribution as an architectural study with transparent resource limits, and as evidence that mixer design should be chosen according to dataset-specific structure rather than a single universal channel-ordering assumption.
 
 \begin{ack}
 This work was conducted as a university research project under constrained computational resources and time.
-Experiments were run using cloud GPU notebooks (Google Colab).
+Experiments were run on NVIDIA L4 GPUs using cloud notebooks (Google Colab).
 We thank the authors of the baseline codebases and benchmark datasets used in this study.
 \end{ack}
 

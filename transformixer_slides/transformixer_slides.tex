@@ -35,6 +35,7 @@
     \item Main results
     \item Mixer ablation
     \item Permutation \& attention analysis
+    \item Training throughput
     \item Limitations and takeaways
   \end{enumerate}
 \end{frame}
@@ -138,7 +139,7 @@
     {\small (sLSTM propagates sequentially along an arbitrary order)}
     \item \textbf{Multi-head specialization} --- different dependency patterns in parallel
     \item \textbf{Simpler architecture} --- drop multi-view + memory tokens
-    \item \textbf{Hardware-parallel over $C$} --- with honest $O(C^2)$ caveat
+    \item \textbf{Hardware-parallel over $C$} --- we measure training it/s; $O(C^2)$ caveat remains
   \end{enumerate}
 
   \vspace{0.6em}
@@ -285,11 +286,33 @@
 \end{frame}
 
 %---------------------------------------------------------------------
+\begin{frame}{Training throughput (NVIDIA L4)}
+  \centering
+  {\small
+  \begin{tabular}{lccc}
+    \toprule
+    Dataset & $C$ & xLSTM-Mixer & Transformixer \\
+    \midrule
+    ECL     & 321 & 3.53 it/s & \textbf{4.67 it/s} \\
+    Traffic & 862 & 1.32 it/s & 1.33 it/s \\
+    \bottomrule
+  \end{tabular}}
+
+  \vspace{0.8em}
+  \begin{itemize}
+    \item \textbf{ECL:} Transformixer $\approx$32\% higher training throughput
+    \item \textbf{Traffic:} essentially tied --- quadratic attention cost catches up at high $C$
+    \item Progress-bar it/s (fwd+bwd, data loading, logging); \alert{not} FLOPs or inference latency
+    \item No general wall-clock superiority claim
+  \end{itemize}
+\end{frame}
+
+%---------------------------------------------------------------------
 \begin{frame}{Limitations (stated openly)}
   \begin{itemize}
     \item Only \textbf{2 datasets}, horizon \textbf{96}, \textbf{single} runs
     \item Main baselines use author-tuned hparams; Transformixer not independently tuned
-    \item No multi-horizon / multi-seed study; attention cost $O(C^2)$ not profiled
+    \item Throughput is single-run it/s on L4; FLOPs / peak memory / inference not profiled
   \end{itemize}
 
   \vspace{0.6em}
@@ -305,6 +328,7 @@
     \item \textbf{Transformixer} = NLinear temporal mix + PE-free Transformer variate mixer (default)
     \item Main results: +PE best on ECL; PE-free best Traffic MAE; bias is dataset-dependent
     \item Controlled ablation: mixer necessary; same PE vs equivariance pattern
+    \item Throughput on L4: faster on ECL, tied on Traffic (parallelism vs $O(C^2)$)
     \item Future: learnable channel orderings via differentiable relaxations
   \end{enumerate}
 
