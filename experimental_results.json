@@ -94,5 +94,21 @@
 			"mse": 0.40676528215408325,
 			"mae": 0.2557980418205261
 		}
+	},
+	{
+		"model": "Transformixer+PE",
+		"dataset": "ECL",
+		"metrics": {
+			"mse": 0.1402551680803299,
+			"mae": 0.2315031737089157
+		}
+	},
+	{
+		"model": "Transformixer+PE",
+		"dataset": "Traffic",
+		"metrics": {
+			"mse": 0.41521453857421875,
+			"mae": 0.26385584473609924
+		}
 	}
 ]

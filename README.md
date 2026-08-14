@@ -11,7 +11,7 @@ This repository contains the project paper, slides, experiment notebooks, baseli
 - Drop-in Transformer variate mixer for the xLSTM-Mixer pipeline
 - Permutation-equivariant cross-variate mixing (no positional encodings on channels)
 - Competitive with strong baselines on Electricity (ECL) and Traffic
-- Improves on xLSTM-Mixer on Traffic (best MAE among compared models); remains close on ECL
+- Transformixer+PE best on ECL; PE-free default best Traffic MAE and improves on xLSTM-Mixer for Traffic
 
 ## Repository layout
 
@@ -49,8 +49,9 @@ Temporal structure is handled by shared NLinear; cross-variate structure is hand
 | Informer      | 0.3263  | 0.4068  | 1.0140      | 0.5624      |
 | PatchTST      | 0.1754  | 0.2603  | 0.4699      | 0.3005      |
 | iTransformer  | 0.1481  | 0.2398  | **0.3931**  | 0.2687      |
-| xLSTM-Mixer   | **0.1480** | **0.2352** | 0.4157   | 0.2607      |
+| xLSTM-Mixer   | 0.1480  | 0.2352  | 0.4157      | 0.2607      |
 | Transformixer | 0.1517  | 0.2364  | 0.4068      | **0.2558**  |
+| Transformixer+PE | **0.1403** | **0.2315** | 0.4152 | 0.2639 |
 
 Full metrics are also stored in [`experimental_results.json`](experimental_results.json). Figures and permutation/attention analyses live under [`transformixer_paper/figures/`](transformixer_paper/figures/).
 
@@ -66,7 +67,8 @@ Analysis helpers:
 ```bash
 cd transformixer_paper/scripts
 python plot_results.py
-python permutation_sensitivity.py
+python plot_ablation.py
+python permutation_sensitivity.py --help
 ```
 
 ## Experiments

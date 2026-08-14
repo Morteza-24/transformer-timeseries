@@ -38,8 +38,10 @@ Recent mixer architectures such as xLSTM-Mixer combine an efficient shared linea
 However, recurrent mixing along the variate axis is inherently order-sensitive: it depends on an arbitrary channel ordering, propagates information sequentially across channels, and relies on a forward/reverse multi-view mechanism to mitigate that dependence.
 We propose \textbf{Transformixer}, which retains reversible instance normalization and shared NLinear temporal mixing, but replaces the ordered sLSTM variate mixer with a Transformer encoder over variate tokens \emph{without} positional encodings.
 The resulting mixer is permutation-equivariant, realizes direct pairwise interactions among all variates in a single layer, and removes the need for memory tokens and bidirectional multi-view fusion.
-On Electricity and Traffic with lookback and horizon $96$, Transformixer is competitive with strong baselines: it improves upon xLSTM-Mixer on Traffic (including the best MAE among compared models) while remaining slightly behind on Electricity.
-Our study is intentionally limited in breadth by available compute and time (two datasets, one horizon); nevertheless, the present results suggest that Transformixer is a promising direction, and future work can explore this idea more thoroughly across additional datasets, horizons, and training budgets.
+On Electricity and Traffic with lookback and horizon $96$, we report both the PE-free default and a fixed-sinusoidal-PE variant alongside five external baselines.
+Transformixer+PE achieves the best ECL result among all compared models (MSE $0.1403$, MAE $0.2315$), while the PE-free default improves upon xLSTM-Mixer on Traffic (including the best MAE among compared models).
+A controlled ablation under the same RevIN+NLinear front-end confirms that variate mixing is necessary on both datasets and that positional bias is dataset-dependent: fixed channel-position encodings help ECL but not Traffic relative to the PE-free mixer.
+Our study is intentionally limited in breadth by available compute and time (two datasets, one horizon, single seeds); nevertheless, the present results suggest that Transformixer is a promising direction, and future work can explore this idea more thoroughly across additional datasets, horizons, and training budgets.
 \end{abstract}
 
 \section{Introduction}
@@ -63,7 +65,8 @@ This view is complementary to iTransformer~\citep{liu2024itransformer}: we reuse
 \begin{itemize}
   \item We introduce Transformixer, a drop-in permutation-equivariant Transformer variate mixer for the xLSTM-Mixer pipeline.
   \item We analyze inductive-bias differences versus ordered sLSTM mixing (equivariance, global interactions, architectural simplification, and parallelism), not only forecasting accuracy.
-  \item We compare against five baselines on Electricity and Traffic ($L{=}H{=}96$) and discuss when the redesign helps, under clearly stated  limitations.
+  \item We compare against five baselines on Electricity and Traffic ($L{=}H{=}96$) and report a controlled mixer ablation (sLSTM FULL, PE-free Transformer, Transformer with fixed PE, and NLinear-only) under a shared training recipe.
+  \item We discuss when the redesign helps and how the equivariance--accuracy tradeoff depends on the dataset, under clearly stated limitations.
 \end{itemize}
 
 \section{Related Work}
@@ -104,7 +107,8 @@ Non-stationarity is a central obstacle in LTSF.
 RevIN~\citep{kim2021revin} applies reversible instance normalization to reduce distribution shift between train and test windows and is now a standard component in many competitive models, including both xLSTM-Mixer and Transformixer.
 Separately, set learning theory~\citep{zaheer2017deepsets} formalizes permutation-invariant and equivariant maps over unordered collections.
 When multivariate channels lack a natural total order, as with sensors, meters, or traffic detectors, treating variates as a set is a natural inductive bias.
-Transformixer's omission of positional encodings along the variate axis is a concrete realization of that principle: the mixer is permutation-equivariant by construction, in contrast to recurrent ordered mixing and to Transformer mixers that inject positional signals on the channel axis.
+Transformixer's default omission of positional encodings along the variate axis is a concrete realization of that principle: the mixer is permutation-equivariant by construction, in contrast to recurrent ordered mixing and to Transformer mixers that inject positional signals on the channel axis.
+Our ablation results (Section~\ref{sec:ablation}) show that this design choice is not uniformly optimal in accuracy, motivating future work on learnable channel orderings.
 
 \paragraph{Positioning.}
 In summary, prior work offers strong temporal Transformers, channel-independent patch models, linear and MLP mixers, inverted variate-token attention, and recurrent joint mixers.
@@ -158,11 +162,12 @@ This stage models temporal dynamics efficiently and independently of channel ord
 
 \subsection{Variate tokenization and Transformer mixing}
 We rearrange $\hat Y_0$ so that each variate becomes a token of dimension $H$, embed tokens with a linear map $H \rightarrow d$, and process the sequence of $C$ tokens with a stack of standard Transformer encoder layers~\citep{vaswani2017attention}: multi-head self-attention and a position-wise feed-forward network, with residual connections and layer normalization.
-Crucially, we \emph{omit positional encodings} and use full (non-causal) attention.
+Crucially, the default model \emph{omits positional encodings} and uses full (non-causal) attention.
+Our implementation also supports an optional fixed sinusoidal positional embedding on the variate axis for ablation; adding PE breaks permutation equivariance.
 A final linear map $d \rightarrow H$ produces refined horizon vectors per variate, which are rearranged and RevIN-denormalized to obtain $\hat Y$.
 
-\paragraph{Permutation equivariance.}
-Because the embedding, attention, feed-forward maps, and output projection are applied identically to every token and attention is a symmetric function of the token set, for any channel permutation matrix $P$,
+\paragraph{Permutation equivariance (PE-free default).}
+When positional encodings are omitted, the embedding, attention, feed-forward maps, and output projection are applied identically to every token and attention is a symmetric function of the token set, so for any channel permutation matrix $P$,
 \begin{equation}
   f_\theta(XP) = f_\theta(X)P.
 \end{equation}
@@ -231,6 +236,10 @@ In contrast, Transformixer does \emph{not} benefit from a dedicated hyperparamet
 The baselines therefore enjoy published, author-recommended configurations, while Transformixer is evaluated under a comparatively untuned setup.
 We treat the study as an architectural comparison under practical training budgets rather than a fully unified or exhaustively tuned hyperparameter sweep.
 
+\paragraph{Controlled mixer ablation.}
+To isolate the effect of the variate mixer while keeping the temporal front-end fixed, we retrain four variants under the same recipe above: (A) NLinear-only (RevIN+NLinear with the mixer disabled), (B) xLSTM-Mixer FULL (sLSTM with memory tokens and forward/reverse fusion), (C) Transformixer without PE (our default), and (D) Transformixer with fixed sinusoidal PE on variate tokens.
+Table~\ref{tab:main} reports both Transformixer variants---PE-free (C) and fixed-PE (D)---alongside external baselines; Table~\ref{tab:ablation} summarizes the full controlled comparison.
+
 \paragraph{Scope limitations.}
 Due to limited computational resources and project time, we report a single run per model--dataset pair, only horizon $96$, and only two datasets.
 We do not claim comprehensive state-of-the-art coverage; broader multi-horizon and multi-seed evaluation is left to future work (Section~\ref{sec:discussion}).
@@ -252,24 +261,25 @@ We do not claim comprehensive state-of-the-art coverage; broader multi-horizon a
     RLinear      & 0.1973 & 0.2740 & 0.6463 & 0.3844 \\
     Informer     & 0.3263 & 0.4068 & 1.0140 & 0.5624 \\
     PatchTST     & 0.1754 & 0.2603 & 0.4699 & 0.3005 \\
-    iTransformer & \underline{0.1481} & 0.2398 & \textbf{0.3931} & 0.2687 \\
-    xLSTM-Mixer  & \textbf{0.1480} & \textbf{0.2352} & 0.4157 & \underline{0.2607} \\
-    Transformixer & 0.1517 & \underline{0.2364} & \underline{0.4068} & \textbf{0.2558} \\
+    iTransformer & 0.1481 & 0.2398 & \textbf{0.3931} & 0.2687 \\
+    xLSTM-Mixer  & \underline{0.1480} & \underline{0.2352} & 0.4157 & \underline{0.2607} \\
+    Transformixer & 0.1517 & 0.2364 & \underline{0.4068} & \textbf{0.2558} \\
+    Transformixer+PE & \textbf{0.1403} & \textbf{0.2315} & 0.4152 & 0.2639 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-Table~\ref{tab:main} and Figure~\ref{fig:bars} summarize the main comparison.
-Transformixer is competitive overall and does not dominate every cell.
+Table~\ref{tab:main} and Figure~\ref{fig:bars} summarize the main comparison against external baselines.
+We report two Transformixer variants: the PE-free default (C) and fixed-sinusoidal PE (D); neither dominates every cell, and the better choice is dataset-dependent.
 
-On \textbf{Traffic}, Transformixer improves upon its direct predecessor xLSTM-Mixer on both MSE ($0.4068$ vs.\ $0.4157$) and MAE ($0.2558$ vs.\ $0.2607$), achieving the best MAE among all compared models and the second-best MSE after iTransformer.
-This is consistent with the hypothesis that direct, order-agnostic attention is particularly useful when many channels interact without a meaningful 1-D order.
+On \textbf{Traffic}, the PE-free default improves upon its direct predecessor xLSTM-Mixer on both MSE ($0.4068$ vs.\ $0.4157$) and MAE ($0.2558$ vs.\ $0.2607$), achieving the best MAE among all compared models and the second-best MSE after iTransformer.
+Transformixer+PE is slightly worse on Traffic (MSE $0.4152$, MAE $0.2639$), consistent with the hypothesis that index-aware positional bias is not helpful when many channels interact without a meaningful 1-D order.
 
-On \textbf{ECL}, xLSTM-Mixer and iTransformer remain slightly ahead (MSE $0.1480$ / $0.1481$ versus $0.1517$ for Transformixer).
-The gap is modest ($\approx 2.5\%$ relative MSE versus xLSTM-Mixer), suggesting that ordered sLSTM mixing with memory tokens remains a strong alternative at moderate $C$, or that Transformixer hyperparameters inherited from the xLSTM-Mixer setup are not fully optimal for ECL.
+On \textbf{ECL}, Transformixer+PE leads the comparison (MSE $0.1403$, MAE $0.2315$), improving upon xLSTM-Mixer by $\approx$5.2\% relative MSE and upon the PE-free default by $\approx$7.6\% relative MSE.
+The PE-free default remains slightly behind xLSTM-Mixer and iTransformer (MSE $0.1517$ vs.\ $0.1480$ / $0.1481$; $\approx 2.5\%$ relative MSE versus xLSTM-Mixer), indicating that the ECL gap of the equivariant variant is not due to attention being inherently weaker than ordered sLSTM mixing.
 
 Weaker baselines (Informer, RLinear) lag substantially on both datasets, indicating that the evaluation setting is non-trivial and that the stronger inverted/mixer models form a meaningful comparison group.
-Relative to xLSTM-Mixer specifically, Transformixer trades a small regression on ECL for a clear gain on the higher-dimensional Traffic benchmark (Figure~\ref{fig:relative}).
+Relative to xLSTM-Mixer, the Transformixer family trades a dataset-dependent positional-bias choice for gains on at least one benchmark per variant (Figure~\ref{fig:relative}).
 
 \begin{figure}[t]
   \centering
@@ -279,24 +289,63 @@ Relative to xLSTM-Mixer specifically, Transformixer trades a small regression on
   \begin{minipage}{0.98\linewidth}
     \includegraphics[width=\linewidth]{figures/results_mae.pdf}
   \end{minipage}
-  \caption{MSE (top) and MAE (bottom) on ECL and Traffic ($L{=}H{=}96$). Transformixer bars are outlined.}
+  \caption{MSE (top) and MAE (bottom) on ECL and Traffic ($L{=}H{=}96$). Informer omitted for scale (see Table~\ref{tab:main}); y-axes zoomed around competitive models. Both Transformixer variants are outlined.}
   \label{fig:bars}
 \end{figure}
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=0.55\linewidth]{figures/relative_mse_vs_xlstm.pdf}
-  \caption{Relative MSE change of Transformixer versus xLSTM-Mixer (negative is better for Transformixer).}
+  \caption{Relative MSE change of both Transformixer variants versus xLSTM-Mixer (negative is better for Transformixer).}
   \label{fig:relative}
+\end{figure}
+
+\subsection{Mixer ablation}
+\label{sec:ablation}
+
+Table~\ref{tab:ablation} and Figure~\ref{fig:ablation} report the controlled comparison under the shared RevIN+NLinear front-end (seed $42$, $10$ epochs, $L{=}H{=}96$).
+All mixer variants substantially outperform NLinear-only (A), reducing MSE by $\approx$25--30\% on ECL and $\approx$38--39\% on Traffic, confirming that cross-variate mixing is necessary beyond shared temporal linear mapping on both benchmarks.
+
+On \textbf{Traffic}, the PE-free default (C) is the strongest ablation variant, improving upon xLSTM FULL (B) by $\approx$2.1\% relative MSE and $\approx$1.9\% relative MAE.
+Adding fixed sinusoidal PE (D) slightly degrades Traffic performance ($+2.1\%$ MSE, $+3.2\%$ MAE versus C), suggesting that index-aware positional bias is not helpful on this high-$C$ benchmark under our protocol.
+
+On \textbf{ECL}, the pattern reverses: fixed PE (D) achieves the best ablation result (MSE $0.1403$, MAE $0.2315$), improving upon xLSTM FULL by $\approx$5.2\% relative MSE and upon the PE-free default by $\approx$7.6\% relative MSE.
+This indicates that the dataset channel index carries exploitable structure on ECL, even though our experiment cannot distinguish semantic ordering, channel identity, correlation structure, or optimization effects.
+Importantly, the large gain over NLinear-only on ECL shows that cross-variate mixing remains valuable there; the open question is whether positional bias should be fixed, learned, or omitted.
+
+\begin{table}[t]
+  \centering
+  \caption{Controlled mixer ablation under a shared RevIN+NLinear front-end ($L{=}H{=}96$, seed $42$, $10$ epochs). Best is \textbf{bold}; second-best is \underline{underlined}.}
+  \label{tab:ablation}
+  \setlength{\tabcolsep}{3.5pt}
+  \begin{tabular}{lcccc}
+    \toprule
+    & \multicolumn{2}{c}{ECL} & \multicolumn{2}{c}{Traffic} \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-5}
+    Variate mixer & MSE & MAE & MSE & MAE \\
+    \midrule
+    A: NLinear only          & 0.2016 & 0.2731 & 0.6713 & 0.3776 \\
+    B: xLSTM FULL           & \underline{0.1480} & \underline{0.2352} & 0.4157 & \underline{0.2607} \\
+    C: Transformixer (no PE) & 0.1517 & 0.2364 & \textbf{0.4068} & \textbf{0.2558} \\
+    D: Transformixer (+ PE)  & \textbf{0.1403} & \textbf{0.2315} & \underline{0.4152} & 0.2639 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.98\linewidth]{figures/ablation_mse.pdf}
+  \caption{Controlled mixer ablation (MSE) on ECL and Traffic. NLinear-only (A) omitted for scale (see Table~\ref{tab:ablation}); y-axis zoomed around mixer variants. Both Transformixer variants are outlined.}
+  \label{fig:ablation}
 \end{figure}
 
 \subsection{Permutation behavior}
 \label{sec:perm}
-By construction, Transformixer is permutation-equivariant along channels: for a channel permutation matrix $P$, $f(XP)=f(X)P$.
-Unit tests in our implementation confirm this identity up to numerical tolerance.
+By construction, the PE-free default is permutation-equivariant along channels: for a channel permutation matrix $P$, $f(XP)=f(X)P$.
+Unit tests in our implementation confirm this identity up to numerical tolerance; the PE ablation variant (C) does not satisfy this property.
 In contrast, xLSTM-Mixer's sLSTM mixer consumes an ordered sequence of variate tokens (with an optional reverse view), so the computation itself depends on channel order.
 
-To probe the practical effect of this distinction, we load the Traffic-trained Transformixer and xLSTM-Mixer checkpoints and evaluate MSE/MAE under the identity channel order and $K{=}8$ independent random permutations of the variate axis (Table~\ref{tab:perm}).
+To probe the practical effect of this distinction, we load Traffic-trained checkpoints for the PE-free default (C) and xLSTM-Mixer (B) and evaluate MSE/MAE under the identity channel order and $K{=}8$ independent random permutations of the variate axis (Table~\ref{tab:perm}).
 Transformixer's errors are essentially unchanged across permutations (MSE std $1.4{\times}10^{-3}$), as expected from equivariance.
 xLSTM-Mixer shows similarly small metric drift (MSE std $1.5{\times}10^{-3}$), consistent with forward/reverse multi-view partially mitigating order artifacts, but remains strictly worse on every run: mean MSE $1.349$ vs.\ $1.286$ ($\approx 4.6\%$ relative) and mean MAE $0.923$ vs.\ $0.903$ ($\approx 2.2\%$ relative).
 The table makes the comparison explicit: both models are fairly stable under channel shuffles in this probe, yet Transformixer occupies a clearly better error regime without relying on ordered mixing.
@@ -335,10 +384,13 @@ This qualitative pattern aligns with the claim that the mixer models direct pair
 \label{sec:discussion}
 
 \paragraph{When does the Transformer mixer help?}
-The Traffic improvement aligns with the motivation in Section~\ref{sec:rationale}: high-$C$ forecasting benefits from direct pairwise mixing and set equivariance.
-The permutation probe in Section~\ref{sec:perm} further shows that Transformixer remains stable under channel shuffles and consistently outperforms xLSTM-Mixer on that controlled evaluation, while the attention map illustrates structured cross-variate interactions.
-On ECL, the slightly better xLSTM-Mixer result cautions against a universal claim that attention is a strictly superior variate mixer.
-Recurrent mixing with memory tokens may still be competitive when $C$ is moderate, when training budgets are short, or when hyperparameters are tuned for the sLSTM design.
+The Traffic improvement of the PE-free default aligns with the motivation in Section~\ref{sec:rationale}: high-$C$ forecasting benefits from direct pairwise mixing, and both the main table and ablation show that the equivariant variant is strongest on this benchmark.
+The permutation probe in Section~\ref{sec:perm} further shows that the PE-free model remains stable under channel shuffles and consistently outperforms xLSTM-Mixer on that controlled evaluation, while the attention map illustrates structured cross-variate interactions.
+
+On ECL, the story is more nuanced.
+Transformixer+PE leads the main comparison and the ablation, improving upon xLSTM FULL, whereas the PE-free default trails slightly.
+This cautions against a universal claim that set-structured mixing is strictly superior or inferior to ordered recurrent mixing; instead, the appropriate inductive bias appears dataset-dependent.
+The ECL PE gain suggests that index-aware structure can be useful even when channels are not known to follow a semantically meaningful order, although our experiment cannot isolate the underlying mechanism.
 
 \paragraph{Complexity tradeoff.}
 Attention is more hardware-parallel over channels but asymptotically quadratic in $C$.
@@ -353,16 +405,18 @@ This asymmetry may understate Transformixer's potential relative to well-tuned b
 These factors limit statistical strength and strict comparability; we report them explicitly because the project was constrained by compute and time.
 
 \paragraph{Future work.}
-A fuller evaluation would include horizons $\{96,192,336,720\}$, additional datasets (e.g., ETT, Weather), multi-seed mean$\pm$std, controlled ablations (with vs.\ without positional encodings; number of layers/heads), and efficiency profiling.
+A fuller evaluation would include horizons $\{96,192,336,720\}$, additional datasets (e.g., ETT, Weather), multi-seed mean$\pm$std, ablations over mixer depth and head count, and efficiency profiling.
+Motivated by the dataset-dependent PE results, an appealing direction is to learn a global channel permutation or soft ordering jointly with the mixer via a differentiable relaxation such as Gumbel-Sinkhorn or differentiable sorting, allowing the model to discover an index-aware layout when it helps without committing to a fixed arbitrary order a priori.
 Such experiments are feasible with additional GPU resources but were out of scope here.
 
 \section{Conclusion}
 \label{sec:conclusion}
 
 Transformixer replaces the order-sensitive sLSTM variate mixer in xLSTM-Mixer with a PE-free Transformer over variate tokens, preserving RevIN and shared NLinear temporal mixing.
-The redesign targets a more natural inductive bias for unordered channels: permutation equivariance, direct multi-head interactions, and a simpler single-view architecture without memory tokens.
-Empirically, Transformixer is competitive with strong baselines under a limited protocol, improving on xLSTM-Mixer for Traffic while remaining close on Electricity.
-We view the contribution as an architectural study with transparent resource limits, and as evidence that set-structured attention is a promising drop-in alternative for joint variate mixing in mixer-style forecasters.
+The redesign targets permutation equivariance, direct multi-head interactions, and a simpler single-view architecture without memory tokens.
+Empirically, under a limited protocol, Transformixer+PE achieves the best ECL result among compared models, while the PE-free default improves on xLSTM-Mixer for Traffic.
+The controlled ablation further shows that variate mixing is necessary on both datasets and that positional bias is not uniformly beneficial: fixed PE helps ECL but hurts Traffic relative to the equivariant default.
+We view the contribution as an architectural study with transparent resource limits, and as evidence that mixer design should be chosen according to dataset-specific structure rather than a single universal channel-ordering assumption.
 
 \begin{ack}
 This work was conducted as a university research project under constrained computational resources and time.

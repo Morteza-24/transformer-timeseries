@@ -33,6 +33,7 @@
     \item Why Transformer mixing (beyond equivariance)
     \item Experimental setup
     \item Main results
+    \item Mixer ablation
     \item Permutation \& attention analysis
     \item Limitations and takeaways
   \end{enumerate}
@@ -141,46 +142,32 @@
   \end{enumerate}
 
   \vspace{0.6em}
-  Hypothesis: gains should be clearest when $C$ is large (Traffic).
+  Hypothesis: PE-free attention should help most when $C$ is large (Traffic); PE is a separate, dataset-dependent knob.
 \end{frame}
 
 %---------------------------------------------------------------------
 \begin{frame}{Experimental setup}
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
-      \textbf{Datasets}
-      \begin{itemize}
-        \item ECL: $C{=}321$
-        \item Traffic: $C{=}862$
-      \end{itemize}
-      \textbf{Protocol}
-      \begin{itemize}
-        \item $L{=}H{=}96$
-        \item Metrics: MSE, MAE
-        \item Multivariate ($M$)
-      \end{itemize}
+      \textbf{Datasets}: ECL ($C{=}321$), Traffic ($C{=}862$)\\
+      \textbf{Protocol}: $L{=}H{=}96$; MSE/MAE; multivariate
+      \vspace{0.4em}
+
+      \textbf{Baselines}: RLinear, Informer, PatchTST, iTransformer, xLSTM-Mixer\\
+      \textbf{Fairness}: baselines author-tuned; Transformixer not independently tuned
     \end{column}
     \begin{column}{0.48\textwidth}
-      \textbf{Baselines}
-      \begin{itemize}
-        \item RLinear, Informer
-        \item PatchTST, iTransformer
-        \item xLSTM-Mixer
-      \end{itemize}
-      \textbf{Fairness note}
-      \begin{itemize}
-        \item Baselines: author-recommended hparams
-        \item Transformixer: \alert{not tuned}\\
-        {\small (inherits xLSTM-Mixer settings)}
-      \end{itemize}
+      \textbf{Controlled ablation (same recipe)}\\
+      A: NLinear only \quad B: xLSTM FULL\\
+      C: Transformixer (no PE, default)\\
+      D: Transformixer (+ PE)
+      \vspace{0.4em}
+
+      \begin{alertblock}{Scope}
+        2 datasets, 1 horizon, single runs. Main table includes both Transformixer variants (C and D).
+      \end{alertblock}
     \end{column}
   \end{columns}
-
-  \vspace{0.8em}
-  \begin{alertblock}{Scope}
-    Limited compute/time $\Rightarrow$ 2 datasets, 1 horizon, single runs.\\
-    Architectural study, not a SOTA claim.
-  \end{alertblock}
 \end{frame}
 
 %---------------------------------------------------------------------
@@ -196,16 +183,18 @@
     RLinear      & 0.1973 & 0.2740 & 0.6463 & 0.3844 \\
     Informer     & 0.3263 & 0.4068 & 1.0140 & 0.5624 \\
     PatchTST     & 0.1754 & 0.2603 & 0.4699 & 0.3005 \\
-    iTransformer & \underline{0.1481} & 0.2398 & \textbf{0.3931} & 0.2687 \\
-    xLSTM-Mixer  & \textbf{0.1480} & \textbf{0.2352} & 0.4157 & \underline{0.2607} \\
-    Transformixer & 0.1517 & \underline{0.2364} & \underline{0.4068} & \textbf{0.2558} \\
+    iTransformer & 0.1481 & 0.2398 & \textbf{0.3931} & 0.2687 \\
+    xLSTM-Mixer  & \underline{0.1480} & \underline{0.2352} & 0.4157 & \underline{0.2607} \\
+    Transformixer & 0.1517 & 0.2364 & \underline{0.4068} & \textbf{0.2558} \\
+    Transformixer+PE & \textbf{0.1403} & \textbf{0.2315} & 0.4152 & 0.2639 \\
     \bottomrule
   \end{tabular}}
 
   \vspace{0.8em}
   \begin{itemize}
-    \item \textbf{Traffic:} beats xLSTM-Mixer; \textbf{best MAE} overall
-    \item \textbf{ECL:} close, slightly behind xLSTM-Mixer / iTransformer ($\sim$2.5\% MSE)
+    \item \textbf{ECL:} Transformixer+PE best overall; PE-free default slightly behind xLSTM / iTransformer
+    \item \textbf{Traffic:} PE-free default beats xLSTM-Mixer; \textbf{best MAE} overall; +PE slightly worse
+    \item Positional bias is dataset-dependent (also confirmed in controlled ablation)
   \end{itemize}
 \end{frame}
 
@@ -216,6 +205,41 @@
       \includegraphics[width=\linewidth]{../transformixer_paper/figures/results_mse.pdf}
     \end{column}
   \end{columns}
+  \vspace{0.3em}
+  {\footnotesize Informer omitted for scale; y-axis zoomed around competitive models.}
+\end{frame}
+
+%---------------------------------------------------------------------
+\begin{frame}{Mixer ablation (shared RevIN+NLinear)}
+  \centering
+  {\scriptsize
+  \begin{tabular}{lcccc}
+    \toprule
+    & \multicolumn{2}{c}{ECL} & \multicolumn{2}{c}{Traffic} \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-5}
+    Variate mixer & MSE & MAE & MSE & MAE \\
+    \midrule
+    A: NLinear only          & 0.2016 & 0.2731 & 0.6713 & 0.3776 \\
+    B: xLSTM FULL           & \underline{0.1480} & \underline{0.2352} & 0.4157 & \underline{0.2607} \\
+    C: Transformixer (no PE) & 0.1517 & 0.2364 & \textbf{0.4068} & \textbf{0.2558} \\
+    D: Transformixer (+ PE)  & \textbf{0.1403} & \textbf{0.2315} & \underline{0.4152} & 0.2639 \\
+    \bottomrule
+  \end{tabular}}
+
+  \vspace{0.6em}
+  \begin{itemize}
+    \item Mixer $\gg$ NLinear-only on both datasets (esp.\ Traffic)
+    \item \textbf{Traffic:} PE-free (C) best; fixed PE (D) hurts
+    \item \textbf{ECL:} fixed PE (D) best; index-aware bias can help
+  \end{itemize}
+\end{frame}
+
+%---------------------------------------------------------------------
+\begin{frame}{Ablation at a glance}
+  \centering
+  \includegraphics[width=0.92\linewidth]{../transformixer_paper/figures/ablation_mse.pdf}
+  \vspace{0.3em}
+  {\footnotesize NLinear-only omitted for scale; y-axis zoomed around mixer variants.}
 \end{frame}
 
 %---------------------------------------------------------------------
@@ -235,7 +259,7 @@
 
   \vspace{0.8em}
   \begin{itemize}
-    \item Transformixer nearly invariant (equivariance)
+    \item PE-free checkpoint: nearly invariant (equivariance)
     \item xLSTM mild drift (multi-view helps), but \textbf{always worse}
     \item Relative gap $\approx$ 4.6\% MSE / 2.2\% MAE on this probe
   \end{itemize}
@@ -264,25 +288,24 @@
 \begin{frame}{Limitations (stated openly)}
   \begin{itemize}
     \item Only \textbf{2 datasets}, horizon \textbf{96}, \textbf{single} runs
-    \item Baselines use author-tuned hparams; Transformixer does \textbf{not}
-    \item No full multi-horizon / multi-seed study (compute \& time)
-    \item Attention cost $O(C^2)$ not profiled
+    \item Main baselines use author-tuned hparams; Transformixer not independently tuned
+    \item No multi-horizon / multi-seed study; attention cost $O(C^2)$ not profiled
   \end{itemize}
 
-  \vspace{0.8em}
+  \vspace{0.6em}
   \begin{block}{Still useful}
-    Competitive results + clearer inductive bias for unordered channels.\\
-    Strongest relative signal on high-$C$ Traffic.
+    Main results and ablation agree: mixer is necessary; PE vs equivariance is dataset-dependent.\\
+    Future work: learnable global permutations (e.g., Gumbel-Sinkhorn).
   \end{block}
 \end{frame}
 
 %---------------------------------------------------------------------
 \begin{frame}{Takeaways}
   \begin{enumerate}
-    \item \textbf{Transformixer} = NLinear temporal mix + PE-free Transformer variate mixer
-    \item Order-agnostic \emph{and} direct multi-head cross-variate mixing
-    \item Competitive with strong baselines; improves on xLSTM-Mixer for Traffic
-    \item Promising direction under limited compute; broader eval is future work
+    \item \textbf{Transformixer} = NLinear temporal mix + PE-free Transformer variate mixer (default)
+    \item Main results: +PE best on ECL; PE-free best Traffic MAE; bias is dataset-dependent
+    \item Controlled ablation: mixer necessary; same PE vs equivariance pattern
+    \item Future: learnable channel orderings via differentiable relaxations
   \end{enumerate}
 
   \vspace{1.2em}
